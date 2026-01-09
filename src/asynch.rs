@@ -2,18 +2,26 @@ use crate::common::*;
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::i2c::I2c;
 
-pub struct BH1750<I2C, DELAY> {
+#[cfg(feature = "embassy")]
+pub struct EmbassyDelay;
+
+#[cfg(feature = "embassy")]
+impl DelayNs for EmbassyDelay {
+    async fn delay_ns(&mut self, ns: u32) {
+        // avoid overflow; embassy takes u64
+        let us = (ns as u64 + 999) / 1000;
+        embassy_time::Timer::after_micros(us).await;
+    }
+}
+
+pub struct BH1750Async<I2C, DELAY> {
     com: I2C,
     delay: DELAY,
     address: u8,
     measurement_time_register: u8,
 }
 
-impl<I2C, DELAY> BH1750<I2C, DELAY>
-where
-    I2C: I2c,
-    DELAY: DelayNs,
-{
+impl<I2C, DELAY> BH1750Async<I2C, DELAY> {
     /// Create a new instance of the BH1750 driver
     ///
     /// # Arguments
@@ -48,7 +56,13 @@ where
             measurement_time_register: DEFAULT_MEASUREMENT_TIME_REGISTER,
         }
     }
+}
 
+impl<I2C, DELAY> BH1750Async<I2C, DELAY>
+where
+    I2C: I2c,
+    DELAY: DelayNs,
+{
     /// Gets the current measurement from the sensor in lux
     /// The sensor is automatically set to power down mode after the measurement is taken
     ///
@@ -98,7 +112,7 @@ where
     ) -> Result<f32, BH1750Error<I2C::Error>> {
         let mut data: [u8; 2] = [0; 2];
         self.com.read(self.address, &mut data).await?;
-        let raw = (data[0] as u16) << 8 | data[1] as u16;
+        let raw = u16::from_be_bytes(data);
 
         Ok(raw_to_lux(raw, resolution, self.measurement_time_register))
     }

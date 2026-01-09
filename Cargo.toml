@@ -12,7 +12,9 @@ default = ["blocking"]
 
 blocking = ["dep:embedded-hal"]
 async = ["dep:embedded-hal-async"]
+embassy = ["dep:embassy-time"]
 
 [dependencies]
 embedded-hal = { version = "1.0.0", optional = true }
 embedded-hal-async = { version = "1.0.0", optional = true }
+embassy-time = { version = "0.5.0", optional = true }

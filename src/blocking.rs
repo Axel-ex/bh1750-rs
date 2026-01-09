@@ -159,7 +159,8 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     ) -> Result<f32, BH1750Error<I2C::Error>> {
         let mut data: [u8; 2] = [0; 2];
         self.com.read(self.address, &mut data)?;
-        let raw = (data[0] as u16) << 8 | data[1] as u16;
+        let raw = u16::from_be_bytes(data);
+
         Ok(raw_to_lux(raw, resolution, self.measurement_time_register))
     }
 
