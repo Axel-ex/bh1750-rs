@@ -59,3 +59,26 @@ impl Resolution {
         }
     }
 }
+
+// helpers shared by both implementation
+pub fn raw_to_lux(raw: u16, resolution: Resolution, mtreg: u8) -> f32 {
+    let mut lux = raw as f32 / 1.2;
+
+    if let Resolution::High2 = resolution {
+        lux /= 2.0;
+    }
+
+    if mtreg != DEFAULT_MEASUREMENT_TIME_REGISTER {
+        lux *= DEFAULT_MEASUREMENT_TIME_REGISTER as f32 / mtreg as f32;
+    }
+
+    lux
+}
+
+pub fn typical_measurement_time_ms(res: Resolution, mtreg: u8) -> u32 {
+    let mut d = res.typical_delay_ms();
+    if mtreg != DEFAULT_MEASUREMENT_TIME_REGISTER {
+        d = d * mtreg as u32 / DEFAULT_MEASUREMENT_TIME_REGISTER as u32;
+    }
+    d
+}

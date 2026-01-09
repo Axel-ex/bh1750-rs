@@ -112,22 +112,6 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
         }
     }
 
-    /// Gets the typical measurement time for a given resolution, taking into account the current measurement time register value
-    /// This is useful for calculating the delay between reading continuous measurements
-    ///
-    /// # Arguments
-    /// * `resolution` - The resolution to get the typical measurement time for
-    pub fn get_typical_measurement_time_ms(&self, resolution: Resolution) -> u32 {
-        let mut delay = resolution.typical_delay_ms();
-
-        if self.measurement_time_register != DEFAULT_MEASUREMENT_TIME_REGISTER {
-            delay = delay * self.measurement_time_register as u32
-                / DEFAULT_MEASUREMENT_TIME_REGISTER as u32;
-        }
-
-        delay
-    }
-
     /// Gets the current measurement from the sensor in lux
     /// The sensor is automatically set to power down mode after the measurement is taken
     ///
@@ -141,7 +125,8 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     ) -> Result<f32, BH1750Error<I2C::Error>> {
         self.send_instruction(resolution.one_time_measurement_instruction())?;
         // Waiting 20% longer than the typical measurement time to be safe yields good results
-        let safe_delay = self.get_typical_measurement_time_ms(resolution) * 12 / 10;
+        let safe_delay =
+            typical_measurement_time_ms(resolution, self.measurement_time_register) * 12 / 10;
         self.delay.delay_ms(safe_delay);
 
         self.get_current_measurement(resolution)
@@ -175,7 +160,7 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
         let mut data: [u8; 2] = [0; 2];
         self.com.read(self.address, &mut data)?;
         let raw = (data[0] as u16) << 8 | data[1] as u16;
-        Ok(self.raw_to_lux(raw, resolution))
+        Ok(raw_to_lux(raw, resolution, self.measurement_time_register))
     }
 
     /// Sends the power down instruction to the sensor
@@ -220,19 +205,5 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     fn send_instruction(&mut self, instr: u8) -> Result<(), BH1750Error<I2C::Error>> {
         self.com.write(self.address, &[instr])?;
         Ok(())
-    }
-
-    fn raw_to_lux(&self, raw: u16, resolution: Resolution) -> f32 {
-        let mut lux = raw as f32 / 1.2;
-
-        if let Resolution::High2 = resolution {
-            lux /= 2.0;
-        }
-
-        if self.measurement_time_register != DEFAULT_MEASUREMENT_TIME_REGISTER {
-            lux *= DEFAULT_MEASUREMENT_TIME_REGISTER as f32 / self.measurement_time_register as f32;
-        }
-
-        lux
     }
 }

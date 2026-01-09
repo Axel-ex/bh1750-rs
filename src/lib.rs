@@ -1,6 +1,6 @@
 #![no_std]
 
-pub mod common;
+mod common;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
