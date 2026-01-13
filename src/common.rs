@@ -26,8 +26,8 @@ impl<I2CError> From<I2CError> for BH1750Error<I2CError> {
     }
 }
 
-/// Enum representing the possible resolution modes of the sensor
-#[derive(Debug, Copy, Clone)]
+/// Errors returned by the BH1750 driver.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Resolution {
     High,  // 1 lx resolution
     High2, // 0.5 lx resolution

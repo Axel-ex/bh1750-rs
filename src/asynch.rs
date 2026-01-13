@@ -1,43 +1,11 @@
-//! # BH1750 driver
-//! A platform-agnostic, 'no_std' compatible Rust driver for the BH1750 ambient light sensor using the `embedded-hal-async` traits.
-//!
-//! The I²C instruction set is based on the following datasheet: [BH1750 datasheet](https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf) \
-//! All instructions are implemented and supported.
-//!
-//! The raw values read from the sensor are converted to lux, taking into account the resolution mode and measurement time register value.
-//!
-//! ## Usage
-//! To use this driver, import it and an `embedded_hal-async` implementation, then create an instance of the driver.
-//!
-//! You can call the `get_one_time_measurement` function to get a single measurement from the sensor.
-//!
-//! Alternatively, you can call `start_continuous_measurement` to start continuous measurements and then call `get_current_measurement` to get the latest measurement.
+//! Async BH1750 driver using `embedded-hal-async`.
+
 use crate::common::*;
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::i2c::I2c;
 
-/// Embassy-based async delay adapter.
-///
-/// This type implements [`embedded_hal_async::delay::DelayNs`] using
-/// [`embassy_time::Timer`].
-///
-/// It is provided as a convenience for Embassy users so they can use the
-/// async BH1750 driver without writing their own delay adapter.
-///
-/// Enabled only when the `embassy` feature is active.
-#[cfg(feature = "embassy")]
-pub struct EmbassyDelay;
-
-#[cfg(feature = "embassy")]
-impl DelayNs for EmbassyDelay {
-    async fn delay_ns(&mut self, ns: u32) {
-        let us = (ns as u64).div_ceil(1000);
-        embassy_time::Timer::after_micros(us).await;
-    }
-}
-
 pub struct BH1750Async<I2C, DELAY> {
-    com: I2C,
+    i2c: I2C,
     delay: DELAY,
     address: u8,
     measurement_time_register: u8,
@@ -52,7 +20,7 @@ impl<I2C, DELAY> BH1750Async<I2C, DELAY> {
     /// * `address_pin_high` - The state of the address pin on the sensor (This determines the I2C address)
     pub fn new(i2c: I2C, delay: DELAY, address_pin_high: bool) -> Self {
         Self {
-            com: i2c,
+            i2c,
             delay,
             address: if address_pin_high {
                 STANDARD_ADDRESS_HIGH
@@ -72,7 +40,7 @@ impl<I2C, DELAY> BH1750Async<I2C, DELAY> {
     /// * `address` - The I2C address of the sensor
     pub fn new_custom_address(i2c: I2C, delay: DELAY, address: u8) -> Self {
         Self {
-            com: i2c,
+            i2c,
             delay,
             address,
             measurement_time_register: DEFAULT_MEASUREMENT_TIME_REGISTER,
@@ -133,7 +101,7 @@ where
         resolution: Resolution,
     ) -> Result<f32, BH1750Error<I2C::Error>> {
         let mut data: [u8; 2] = [0; 2];
-        self.com.read(self.address, &mut data).await?;
+        self.i2c.read(self.address, &mut data).await?;
         let raw = u16::from_be_bytes(data);
 
         Ok(raw_to_lux(raw, resolution, self.measurement_time_register))
@@ -181,7 +149,7 @@ where
     }
 
     async fn send_instruction(&mut self, instr: u8) -> Result<(), BH1750Error<I2C::Error>> {
-        self.com.write(self.address, &[instr]).await?;
+        self.i2c.write(self.address, &[instr]).await?;
         Ok(())
     }
 }

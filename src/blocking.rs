@@ -1,76 +1,11 @@
-//! # BH1750 driver
-//! A platform-agnostic, 'no_std' compatible Rust driver for the BH1750 ambient light sensor using the `embedded-hal` traits.
-//!
-//! The I²C instruction set is based on the following datasheet: [BH1750 datasheet](https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf) \
-//! All instructions are implemented and supported.
-//!
-//! The raw values read from the sensor are converted to lux, taking into account the resolution mode and measurement time register value.
-//!
-//! ## Usage
-//! To use this driver, import it and an `embedded_hal` implementation, then create an instance of the driver.
-//!
-//! You can call the `get_one_time_measurement` function to get a single measurement from the sensor.
-//!
-//! Alternatively, you can call `start_continuous_measurement` to start continuous measurements and then call `get_current_measurement` to get the latest measurement.
-//!
-//! ## Example
-//! This example uses the `esp-hal` crate to interface with the sensor on an ESP32 microcontroller.
-//!
-//! ```rust no_run
-//! #![no_std]
-//! #![no_main]
-//!
-//! use esp_backtrace as _;
-//! use bh1750::{BH1750, Resolution};
-//! use esp_hal::{
-//!     clock::ClockControl,
-//!     delay::Delay,
-//!     peripherals::Peripherals,
-//!     prelude::*,
-//!     system::SystemControl,
-//!     gpio::Io
-//! };
-//! use esp_hal::i2c::I2C;
-//!
-//! #[entry]
-//! fn main() -> ! {
-//!     esp_println::logger::init_logger_from_env();
-//!
-//!     let peripherals = Peripherals::take();
-//!     let system = SystemControl::new(peripherals.SYSTEM);
-//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-//!     let delay = Delay::new(&clocks);
-//!
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!
-//!     let i2c = I2C::new(
-//!         peripherals.I2C0,
-//!         io.pins.gpio8,
-//!         io.pins.gpio9,
-//!         100.kHz(),
-//!         &clocks,
-//!         None
-//!     );
-//!
-//!     let mut bh1750 = BH1750::new(i2c, delay, false);
-//!
-//!     loop {
-//!         let lux = bh1750.get_one_time_measurement(Resolution::High)
-//!             .expect("Failed to read BH1750");
-//!
-//!         log::info!("Lux = {:.2}", lux);
-//!
-//!         delay.delay(1000.millis());
-//!     }
-//! }
-//! ```
+//! Blocking BH1750 driver using `embedded-hal`.
 
 use crate::common::*;
 use embedded_hal::delay;
 use embedded_hal::i2c::I2c;
 
 pub struct BH1750<I2C, DELAY> {
-    com: I2C,
+    i2c: I2C,
     delay: DELAY,
     address: u8,
     measurement_time_register: u8,
@@ -85,7 +20,7 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     /// * `address_pin_high` - The state of the address pin on the sensor (This determines the I2C address)
     pub fn new(i2c: I2C, delay: DELAY, address_pin_high: bool) -> Self {
         Self {
-            com: i2c,
+            i2c,
             delay,
             address: if address_pin_high {
                 STANDARD_ADDRESS_HIGH
@@ -105,7 +40,7 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     /// * `address` - The I2C address of the sensor
     pub fn new_custom_address(i2c: I2C, delay: DELAY, address: u8) -> Self {
         Self {
-            com: i2c,
+            i2c,
             delay,
             address,
             measurement_time_register: DEFAULT_MEASUREMENT_TIME_REGISTER,
@@ -158,7 +93,7 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
         resolution: Resolution,
     ) -> Result<f32, BH1750Error<I2C::Error>> {
         let mut data: [u8; 2] = [0; 2];
-        self.com.read(self.address, &mut data)?;
+        self.i2c.read(self.address, &mut data)?;
         let raw = u16::from_be_bytes(data);
 
         Ok(raw_to_lux(raw, resolution, self.measurement_time_register))
@@ -204,7 +139,7 @@ impl<I2C: I2c, DELAY: delay::DelayNs> BH1750<I2C, DELAY> {
     }
 
     fn send_instruction(&mut self, instr: u8) -> Result<(), BH1750Error<I2C::Error>> {
-        self.com.write(self.address, &[instr])?;
+        self.i2c.write(self.address, &[instr])?;
         Ok(())
     }
 }
