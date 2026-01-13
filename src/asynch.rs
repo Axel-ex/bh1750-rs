@@ -1,15 +1,37 @@
+//! # BH1750 driver
+//! A platform-agnostic, 'no_std' compatible Rust driver for the BH1750 ambient light sensor using the `embedded-hal-async` traits.
+//!
+//! The I²C instruction set is based on the following datasheet: [BH1750 datasheet](https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf) \
+//! All instructions are implemented and supported.
+//!
+//! The raw values read from the sensor are converted to lux, taking into account the resolution mode and measurement time register value.
+//!
+//! ## Usage
+//! To use this driver, import it and an `embedded_hal-async` implementation, then create an instance of the driver.
+//!
+//! You can call the `get_one_time_measurement` function to get a single measurement from the sensor.
+//!
+//! Alternatively, you can call `start_continuous_measurement` to start continuous measurements and then call `get_current_measurement` to get the latest measurement.
 use crate::common::*;
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::i2c::I2c;
 
+/// Embassy-based async delay adapter.
+///
+/// This type implements [`embedded_hal_async::delay::DelayNs`] using
+/// [`embassy_time::Timer`].
+///
+/// It is provided as a convenience for Embassy users so they can use the
+/// async BH1750 driver without writing their own delay adapter.
+///
+/// Enabled only when the `embassy` feature is active.
 #[cfg(feature = "embassy")]
 pub struct EmbassyDelay;
 
 #[cfg(feature = "embassy")]
 impl DelayNs for EmbassyDelay {
     async fn delay_ns(&mut self, ns: u32) {
-        // avoid overflow; embassy takes u64
-        let us = (ns as u64 + 999) / 1000;
+        let us = (ns as u64).div_ceil(1000);
         embassy_time::Timer::after_micros(us).await;
     }
 }
@@ -22,7 +44,7 @@ pub struct BH1750Async<I2C, DELAY> {
 }
 
 impl<I2C, DELAY> BH1750Async<I2C, DELAY> {
-    /// Create a new instance of the BH1750 driver
+    /// Create a new instance of the asynchronous BH1750 driver
     ///
     /// # Arguments
     /// * `i2c` - The I2C bus the sensor is connected to
@@ -41,7 +63,7 @@ impl<I2C, DELAY> BH1750Async<I2C, DELAY> {
         }
     }
 
-    /// Create a new instance of the BH1750 driver with a custom I2C address
+    /// Create a new instance of the asynchronous BH1750 driver with a custom I2C address
     /// This is useful if you have a sensor that has been modified to use a different address
     ///
     /// # Arguments
@@ -66,7 +88,7 @@ where
     /// Gets the current measurement from the sensor in lux
     /// The sensor is automatically set to power down mode after the measurement is taken
     ///
-    /// This function is blocking and will wait for the measurement to complete
+    /// This async function awaits the measurement time before reading the result.
     ///
     /// # Arguments
     /// * `resolution` - The resolution to take the measurement at
