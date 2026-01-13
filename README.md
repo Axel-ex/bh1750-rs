@@ -21,7 +21,9 @@ Features
 Usage
 -----
 
-Blocking example:
+Blocking:
+
+```Rust
 
 use bh1750::{BH1750, Resolution};
 
@@ -35,9 +37,11 @@ where
     let _ = lux;
     Ok(())
 }
+```
 
-Async example:
+Async:
 
+```Rust
 use bh1750::{BH1750Async, Resolution};
 
 async fn demo<I2C, D>(i2c: I2C, delay: D) -> Result<(), bh1750::BH1750Error<I2C::Error>>
@@ -50,6 +54,7 @@ where
     let _ = lux;
     Ok(())
 }
+```
 
 Measurement modes
 -----------------
